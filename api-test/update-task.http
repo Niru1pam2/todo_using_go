@@ -1,0 +1,7 @@
+PATCH  http://localhost:3000/1
+Content-Type: application/json
+
+{
+    "title": "Completed game",
+    "isfinished": true
+}
