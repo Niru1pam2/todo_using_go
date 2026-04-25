@@ -3,13 +3,21 @@ package routes
 import (
 	"net/http"
 	"strconv"
-	"todo_app/models"
+	"todo_app/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-func getTasks(context *gin.Context) {
-	tasks, err := models.GetAllTasks()
+type TaskHandler struct {
+	service *service.TaskService
+}
+
+func NewTaskHandler(service *service.TaskService) *TaskHandler {
+	return &TaskHandler{service: service}
+}
+
+func (h *TaskHandler) GetTasks(context *gin.Context) {
+	tasks, err := h.service.GetAllTasks()
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{
@@ -21,8 +29,7 @@ func getTasks(context *gin.Context) {
 	context.JSON(http.StatusOK, tasks)
 }
 
-func getSingleTask(context *gin.Context) {
-	var task models.Task
+func (h *TaskHandler) GetSingleTask(context *gin.Context) {
 	taskId, err := strconv.ParseInt(context.Param("id"), 10, 64)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
@@ -32,8 +39,7 @@ func getSingleTask(context *gin.Context) {
 		return
 	}
 
-	task.Id = taskId
-	err = task.GetTask()
+	task, err := h.service.GetSingleTask(taskId)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
@@ -48,10 +54,14 @@ func getSingleTask(context *gin.Context) {
 	})
 }
 
-func insertTask(context *gin.Context) {
-	var task models.Task
+func (h *TaskHandler) InsertTask(context *gin.Context) {
 
-	err := context.ShouldBindJSON(&task)
+	var requestBody struct {
+		Title      string `json:"title" binding:"required"`
+		IsFinished bool   `json:"isFinished"`
+	}
+
+	err := context.ShouldBindJSON(&requestBody)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
@@ -61,15 +71,19 @@ func insertTask(context *gin.Context) {
 		return
 	}
 
-	task.SaveTask()
+	h.service.CreateTask(requestBody.Title, requestBody.IsFinished)
 
 	context.JSON(http.StatusCreated, gin.H{
 		"message": "Added task to Task list",
 	})
 }
 
-func updateTask(context *gin.Context) {
-	var task models.Task
+func (h *TaskHandler) UpdateTask(context *gin.Context) {
+	var requestBody struct {
+		Title      string `json:"title" binding:"required"`
+		IsFinished bool   `json:"isFinished"`
+	}
+
 	taskId, err := strconv.ParseInt(context.Param("id"), 10, 64)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
@@ -79,18 +93,15 @@ func updateTask(context *gin.Context) {
 		return
 	}
 
-	task.Id = taskId
+	err = context.ShouldBindJSON(&requestBody)
 
-	err = context.ShouldBindJSON(&task)
-
-	task.UpdateTask()
+	h.service.UpdateTask(taskId, requestBody.Title, requestBody.IsFinished)
 
 	context.JSON(http.StatusOK, gin.H{"message": "Task updated successfully!"})
 
 }
 
-func deleteTask(context *gin.Context) {
-	var task models.Task
+func (h *TaskHandler) DeleteTask(context *gin.Context) {
 	taskId, err := strconv.ParseInt(context.Param("id"), 10, 64)
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
@@ -100,9 +111,7 @@ func deleteTask(context *gin.Context) {
 		return
 	}
 
-	task.Id = taskId
-
-	err = task.DeleteTask()
+	err = h.service.DeleteTask(taskId)
 
 	if err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{
